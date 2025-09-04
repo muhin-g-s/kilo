@@ -10,7 +10,10 @@
 struct termios orig_termios;
 
 void die(const char *s) {
+	clearScreen();
+
 	perror(s);
+	
 	exit(1);
 }
 
@@ -51,12 +54,18 @@ void editorProcessKeypress() {
   char c = editorReadKey();
   switch (c) {
     case CTRL_KEY('q'):
+			clearScreen();
       exit(0);
       break;
   }
 }
 
 void editorRefreshScreen() {
+	write(STDOUT_FILENO, "\x1b[2J", 4);
+	write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+void clearScreen() {
 	write(STDOUT_FILENO, "\x1b[2J", 4);
 	write(STDOUT_FILENO, "\x1b[H", 3);
 }
