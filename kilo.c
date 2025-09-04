@@ -7,6 +7,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 
+#define KILO_VERSION "0.0.1"
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
@@ -101,9 +102,37 @@ void editorProcessKeypress() {
   }
 }
 
+void drawWelcomeMessage(struct abuf *ab) {
+	const int LEN_WELCOME_MSG = 30;
+
+	char welcome[LEN_WELCOME_MSG];
+	int rowLen = snprintf(welcome, sizeof(welcome),
+		"Kilo editor -- version %s", KILO_VERSION);
+
+	if (rowLen > E.screencols) {
+		rowLen = E.screencols;
+		abAppend(ab, welcome, rowLen);
+		return;
+	}
+
+	const int space = ((E.screencols - rowLen) / 2) - 1;
+
+	abAppend(ab, "~", 1);
+
+	for(int i = 0; i < space; i++) {
+		abAppend(ab, " ", 1);
+	}
+
+	abAppend(ab, welcome, rowLen);
+}
+
 void drawRows(struct abuf *ab) {
 	for(int y = 0; y < E.screenrows; y++) {
-		abAppend(ab, "~", 1);
+		if (y == E.screenrows / 2) {
+      drawWelcomeMessage(ab);
+    } else {
+      abAppend(ab, "~", 1);
+    }
 
 		abAppend(ab, "\x1b[K", 3);
 
