@@ -40,6 +40,8 @@ struct editorConfig {
 	int rowoff;
 	int coloff;
 
+	char *filename;
+
   struct termios orig_termios;
 };
 
@@ -155,6 +157,9 @@ void editorAppendRow(char *s, size_t len) {
 }
 
 void editorOpen(char *filename) {
+	free(E.filename);
+  E.filename = strdup(filename);
+
   FILE *fp = fopen(filename, "r");
   if (!fp) die("fopen");
 
@@ -307,10 +312,9 @@ void drawRow(struct abuf *ab, int rownum) {
 		if (len > E.screencols) len = E.screencols;
 		abAppend(ab, &E.row[filerow].render[E.coloff], len);
 	}
+
 	abAppend(ab, "\x1b[K", 3);
-	if (rownum < E.screenrows - 1) {
-		abAppend(ab, "\r\n", 2);
-	}
+	abAppend(ab, "\r\n", 2);
 }
 
 void drawRows(struct abuf *ab) {
@@ -318,12 +322,33 @@ void drawRows(struct abuf *ab) {
 		drawRow(ab, y);
 }
 
+void editorDrawStatusBar(struct abuf *ab) {
+  abAppend(ab, "\x1b[7m", 4);
+  char status[80], rstatus[80];
+  int len = snprintf(status, sizeof(status), "%.20s - %d lines",
+    E.filename ? E.filename : "[No Name]", E.numrows);
+  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",
+    E.cy + 1, E.numrows);
+  if (len > E.screencols) len = E.screencols;
+  abAppend(ab, status, len);
+  while (len < E.screencols) {
+    if (E.screencols - len == rlen) {
+      abAppend(ab, rstatus, rlen);
+      break;
+    } else {
+      abAppend(ab, " ", 1);
+      len++;
+    }
+  }
+  abAppend(ab, "\x1b[m", 3);
+}
+
 void editorScroll() {
   E.rx = 0;
   if (E.cy < E.numrows) {
     E.rx = editorRowCxToRx(&E.row[E.cy], E.cx);
   }
-	
+
   if (E.cy >= E.rowoff + E.screenrows) {
     E.rowoff = E.cy - E.screenrows + 1;
   }
@@ -344,6 +369,7 @@ void editorRefreshScreen() {
   abAppend(&ab, "\x1b[H", 3);
 
   drawRows(&ab);
+	editorDrawStatusBar(&ab);
 
   char buf[32];
 	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
@@ -368,7 +394,11 @@ void initEditor() {
   E.cy = 0;
 	E.rx = 0;
 
+	E.filename = NULL;
+
   if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+
+	E.screenrows -= 1;
 }
 
 int main(int argc, char *argv[]) {
