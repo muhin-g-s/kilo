@@ -32,6 +32,7 @@ struct editorConfig {
 
 	int numrows;
   erow *row;
+	int rowoff;
 
   struct termios orig_termios;
 };
@@ -186,7 +187,7 @@ void editorMoveCursor(int key) {
       }
       break;
     case ARROW_DOWN:
-      if (E.cy != E.screenrows - 1) {
+      if (E.cy < E.numrows) {
         E.cy++;
       }
       break;
@@ -235,20 +236,20 @@ void drawWelcomeMessage(struct abuf *ab) {
 }
 
 void drawRow(struct abuf *ab, int rownum) {
-	if (rownum >= E.numrows) {
-		if (rownum == E.screenrows / 2 && E.numrows == 0) {
-      drawWelcomeMessage(ab);
+	int filerow = rownum + E.rowoff;
+
+	if (filerow >= E.numrows) {
+		if (E.numrows == 0 && rownum == E.screenrows / 3) {
+			drawWelcomeMessage(ab);
 		} else {
 			abAppend(ab, "~", 1);
 		}
 	} else {
-		int len = E.row[rownum].size;
+		int len = E.row[filerow].size;
 		if (len > E.screencols) len = E.screencols;
-		abAppend(ab, E.row[rownum].chars, len);
-	}	
-
+		abAppend(ab, E.row[filerow].chars, len);
+	}
 	abAppend(ab, "\x1b[K", 3);
-
 	if (rownum < E.screenrows - 1) {
 		abAppend(ab, "\r\n", 2);
 	}
@@ -257,10 +258,20 @@ void drawRow(struct abuf *ab, int rownum) {
 void drawRows(struct abuf *ab) {
 	for(int y = 0; y < E.screenrows; y++) 
 		drawRow(ab, y);
+}
 
+void editorScroll() {
+  if (E.cy < E.rowoff) {
+    E.rowoff = E.cy;
+  }
+  if (E.cy >= E.rowoff + E.screenrows) {
+    E.rowoff = E.cy - E.screenrows + 1;
+  }
 }
 
 void editorRefreshScreen() {
+	editorScroll();
+
 	struct abuf ab = ABUF_INIT;
 
 	abAppend(&ab, "\x1b[?25l", 6);
@@ -269,7 +280,7 @@ void editorRefreshScreen() {
   drawRows(&ab);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
   abAppend(&ab, buf, strlen(buf));
 
 	abAppend(&ab, "\x1b[?25h", 6);
@@ -282,6 +293,7 @@ void editorRefreshScreen() {
 void initEditor() {
 	E.numrows = 0;
 	E.row = NULL;
+	E.rowoff = 0;
 
 	E.cx = 0;
   E.cy = 0;
