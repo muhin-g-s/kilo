@@ -57,6 +57,8 @@ struct editorConfig {
 
 	int dirty;
 
+	int foundline;
+
   struct termios orig_termios;
 };
 
@@ -384,7 +386,8 @@ void editorFind() {
       E.cy = i;
       E.cx = editorRowRxToCx(row, match - row->render);
 
-      E.rowoff = (E.cy < E.screenrows) ? 0 : (E.cy - E.screenrows / 2);
+			E.rowoff = (E.cy < E.screenrows) ? 0 : (E.cy - E.screenrows / 2);
+			E.foundline = E.cy; 
 
       break;
     }
@@ -494,6 +497,8 @@ void editorMoveCursor(int key) {
 }
 
 void editorProcessKeypress() {
+	E.foundline = -1;
+
 	static int quit_times = KILO_QUIT_TIMES;
 
   int c = editorReadKey();
@@ -571,6 +576,10 @@ void drawWelcomeMessage(struct abuf *ab) {
 void drawRow(struct abuf *ab, int rownum) {
 	int filerow = rownum + E.rowoff;
 
+	if (filerow == E.foundline) {
+    abAppend(ab, "\x1b[7m", 4);
+	}
+
 	if (filerow >= E.numrows) {
 		if (E.numrows == 0 && rownum == E.screenrows / 3) {
 			drawWelcomeMessage(ab);
@@ -586,6 +595,7 @@ void drawRow(struct abuf *ab, int rownum) {
 
 	abAppend(ab, "\x1b[K", 3);
 	abAppend(ab, "\r\n", 2);
+	abAppend(ab, "\x1b[m", 3);
 }
 
 void drawRows(struct abuf *ab) {
@@ -692,6 +702,8 @@ void initEditor() {
   E.statusmsg_time = 0;
 
 	E.dirty = 0;
+
+	E.foundline = -1;
 
   if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
 
