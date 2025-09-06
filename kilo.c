@@ -246,7 +246,7 @@ void editorOpen(char *filename) {
 }
 
 void editorSave() {
-  if (E.filename == NULL) return;
+  if (E.filename == NULL || E.dirty == 0) return;
 
   int len;
   char *buf = editorRowsToString(&len);
