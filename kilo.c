@@ -17,6 +17,8 @@
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
+#define START_EDITOR_KEY 128
+
 enum editorKey {
 	BACKSPACE = 127,
 
@@ -24,6 +26,8 @@ enum editorKey {
   ARROW_RIGHT,
   ARROW_UP,
   ARROW_DOWN,
+
+	ENTER = '\r',
 };
 
 typedef struct erow {
@@ -59,6 +63,8 @@ struct editorConfig {
 struct editorConfig E;
 
 void editorSetStatusMessage(const char *fmt, ...);
+void editorRefreshScreen();
+char *editorPrompt(char *prompt);
 
 void clearScreen() {
 	write(STDOUT_FILENO, "\x1b[2J", 4);
@@ -321,7 +327,16 @@ void editorOpen(char *filename) {
 }
 
 void editorSave() {
-  if (E.filename == NULL || E.dirty == 0) return;
+  if (E.dirty == 0) return;
+
+	if (E.filename == NULL) {
+    E.filename = editorPrompt("Save as: %s (ESC to cancel)");
+
+    if (E.filename == NULL) {
+      editorSetStatusMessage("Save aborted");
+      return;
+    }
+  }
 
   int len;
   char *buf = editorRowsToString(&len);
@@ -345,7 +360,6 @@ void editorSave() {
   free(buf);
   editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
 }
-
 
 int editorReadKey() {
 	int nread;
@@ -372,6 +386,41 @@ int editorReadKey() {
     return c;
   }
 }
+
+char *editorPrompt(char *prompt) {
+  size_t bufsize = 128;
+  char *buf = malloc(bufsize);
+  size_t buflen = 0;
+  buf[0] = '\0';
+  while (1) {
+    editorSetStatusMessage(prompt, buf);
+    editorRefreshScreen();
+
+    int c = editorReadKey();
+
+    if (c == BACKSPACE) {
+      if (buflen != 0) buf[--buflen] = '\0';
+    } else if (c == CTRL_KEY('q')) {
+
+      editorSetStatusMessage("");
+      free(buf);
+      return NULL;
+    } else if (c == ENTER) {
+      if (buflen != 0) {
+        editorSetStatusMessage("");
+        return buf;
+      }
+    } else if (!iscntrl(c) && c < START_EDITOR_KEY) {
+      if (buflen == bufsize - 1) {
+        bufsize *= 2;
+        buf = realloc(buf, bufsize);
+      }
+      buf[buflen++] = c;
+      buf[buflen] = '\0';
+    }
+  }
+}
+
 
 void editorMoveCursor(int key) {
 	erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
@@ -418,7 +467,7 @@ void editorProcessKeypress() {
   int c = editorReadKey();
 
   switch (c) {
-		case '\r':
+		case ENTER:
       editorInsertNewline();
       break;
 
