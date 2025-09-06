@@ -161,6 +161,30 @@ void editorAppendRow(char *s, size_t len) {
   E.numrows++;
 }
 
+void editorRowInsertChar(erow *row, int at, int c) {
+  if (at < 0 || at > row->size) {
+		at = row->size;
+	}
+
+  row->chars = realloc(row->chars, row->size + 2);
+  memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
+
+  row->size++;
+  row->chars[at] = c;
+
+  editorUpdateRow(row);
+}
+
+void editorInsertChar(int c) {
+  if (E.cy == E.numrows) {
+    editorAppendRow("", 0);
+  }
+
+  editorRowInsertChar(&E.row[E.cy], E.cx, c);
+
+  E.cx++;
+}
+
 void editorOpen(char *filename) {
 	free(E.filename);
   E.filename = strdup(filename);
@@ -195,13 +219,6 @@ int editorReadKey() {
 
 	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
     if (nread == -1 && errno != EAGAIN) die("read");
-  }
-
-	switch (c) {
-		case 'a': return ARROW_LEFT;
-    case 'd': return ARROW_RIGHT;
-    case 'w': return ARROW_UP;
-    case 's': return ARROW_DOWN;
   }
 
 	if (c == '\x1b') {
@@ -269,11 +286,15 @@ void editorProcessKeypress() {
       exit(0);
       break;
 
-	case ARROW_UP:
-	case ARROW_DOWN:
-	case ARROW_LEFT:
-	case ARROW_RIGHT:
-      editorMoveCursor(c);
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
+				editorMoveCursor(c);
+				break;
+		
+		default:
+      editorInsertChar(c);
       break;
   }
 }
