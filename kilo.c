@@ -12,7 +12,7 @@
 #include <fcntl.h>
 
 #define KILO_VERSION "0.0.1"
-#define KILO_TAB_STOP 8
+#define KILO_TAB_STOP 2
 #define KILO_QUIT_TIMES 2
 
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -20,14 +20,14 @@
 #define START_EDITOR_KEY 128
 
 enum editorKey {
-	BACKSPACE = 127,
+  BACKSPACE = 127,
 
   ARROW_LEFT = 1000,
   ARROW_RIGHT,
   ARROW_UP,
   ARROW_DOWN,
 
-	ENTER = '\r',
+  ENTER = '\r',
 };
 
 typedef struct erow {
