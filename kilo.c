@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define KILO_VERSION "0.0.1"
 #define KILO_TAB_STOP 8
@@ -53,6 +54,8 @@ struct editorConfig {
 };
 
 struct editorConfig E;
+
+void editorSetStatusMessage(const char *fmt, ...);
 
 void clearScreen() {
 	write(STDOUT_FILENO, "\x1b[2J", 4);
@@ -114,6 +117,26 @@ int getWindowSize(int *rows, int *cols) {
     *rows = ws.ws_row;
     return 0;
   }
+}
+
+char *editorRowsToString(int *buflen) {
+  int totlen = 0;
+  int j;
+  for (j = 0; j < E.numrows; j++)
+    totlen += E.row[j].size + 1;
+
+  *buflen = totlen;
+
+  char *buf = malloc(totlen);
+  char *p = buf;
+  for (j = 0; j < E.numrows; j++) {
+    memcpy(p, E.row[j].chars, E.row[j].size);
+    p += E.row[j].size;
+    *p = '\n';
+    p++;
+  }
+
+  return buf;
 }
 
 int editorRowCxToRx(erow *row, int cx) {
@@ -215,6 +238,30 @@ void editorOpen(char *filename) {
   fclose(fp);
 }
 
+void editorSave() {
+  if (E.filename == NULL) return;
+
+  int len;
+  char *buf = editorRowsToString(&len);
+  int fd = open(E.filename, O_RDWR | O_CREAT, 0644);
+
+  if (fd != -1) {
+    if (ftruncate(fd, len) != -1) {
+      if (write(fd, buf, len) == len) {
+        close(fd);
+        free(buf);
+        editorSetStatusMessage("%d bytes written to disk", len);
+        return;
+      }
+    }
+    close(fd);
+  }
+
+  free(buf);
+  editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
+}
+
+
 int editorReadKey() {
 	int nread;
 	char c;
@@ -291,6 +338,10 @@ void editorProcessKeypress() {
     case CTRL_KEY('q'):
 			clearScreen();
       exit(0);
+      break;
+		
+		case CTRL_KEY('s'):
+      editorSave();
       break;
 
 		case ARROW_UP:
@@ -471,7 +522,7 @@ int main(int argc, char *argv[]) {
     editorOpen(argv[1]);
   }
 
-	editorSetStatusMessage("HELP: Ctrl-Q = quit");
+	editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
 	while (1) {
 		editorRefreshScreen();
